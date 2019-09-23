@@ -12,6 +12,7 @@ with open('README.md') as f:
 
 requirements = [
     'python-telegram-bot',
+    'wakeonlan',
 ]
 
 testing_requirements = [

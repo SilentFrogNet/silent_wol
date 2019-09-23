@@ -2,15 +2,13 @@ import logging
 
 from telegram import (
     InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup
+    InlineKeyboardMarkup
 )
 from telegram.ext import (
     Updater,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ConversationHandler,
     Filters
 )
 
@@ -19,13 +17,13 @@ from silent_wol.credentials import (
     bot_user_name
 )
 from silent_wol.utils import utils
-from silent_wol.register_mixin import WoLRegisterMixin
+from silent_wol.core.register_mixin import WoLRegisterMixin
 from silent_wol.utils.decorators import (
     restricted,
     send_typing_action
 )
 from silent_wol import settings
-
+from silent_wol.core.wol_sol import WolSol
 
 # Enable logging
 logging.basicConfig(
@@ -49,11 +47,9 @@ class SilentWolBot(WoLRegisterMixin):
         self.logger = logging.getLogger(__name__)
 
         self.conn = utils.db.connect()
+        self.wol_sol = WolSol()
 
-        self.devices = {
-            'Ilario\'s PC': '11:22:33:44:aa:bb',
-            'Raspberry Pi': '1a:2f:ff:e4:a4:2b',
-        }
+        self.devices = utils.db.get_devices()
 
         self.init_register()
 
@@ -223,6 +219,18 @@ You can control me by sending these commands:
             button_list.append(InlineKeyboardButton("Cancel", callback_data=f"{action}cancel"))
         return InlineKeyboardMarkup(utils.build_menu(button_list, n_cols=4))
 
+    def _get_device_mac(self, dev):
+        obj = self.devices.get(dev, None)
+        if obj:
+            return obj['mac']
+        return None
+
+    def _get_device_id(self, dev):
+        obj = self.devices.get(dev, None)
+        if obj:
+            return obj['id']
+        return None
+
     def _wol_handler(self, update, context):
         """
         This will handle the callback of the wol (/wakeup) action
@@ -237,11 +245,13 @@ You can control me by sending these commands:
             )
             return
 
-        mac = self.devices.get(dev, None)
+        mac = self._get_device_mac(dev)
+
+        self.wol_sol.wol(mac)
 
         context.bot.send_message(
             chat_id=chat_id,
-            text=f"WoL {mac}!"
+            text=f"WoL sent to {dev}({mac})!"
         )
 
     def _sol_handler(self, update, context):
@@ -258,11 +268,13 @@ You can control me by sending these commands:
             )
             return
 
-        mac = self.devices.get(dev, None)
+        mac = self._get_device_mac(dev)
+
+        self.wol_sol.sol(mac)
 
         context.bot.send_message(
             chat_id=chat_id,
-            text=f"SoL {mac}!"
+            text=f"SoL sent to {dev}({mac})!"
         )
 
     def _edit_handler(self, update, context):
@@ -278,6 +290,9 @@ You can control me by sending these commands:
                 text="Operation cancelled!"
             )
             return
+
+        dev_id = self._get_device_id(dev)
+        utils.db.update_device(dev_id)      # TODO: missing name, mac
 
         context.bot.send_message(
             chat_id=chat_id,
@@ -298,7 +313,8 @@ You can control me by sending these commands:
             )
             return
 
-        self.db.delete_device(name, mac)
+        dev_id = self._get_device_id(dev)
+        utils.db.delete_device(dev_id)
 
         context.bot.send_message(
             chat_id=chat_id,

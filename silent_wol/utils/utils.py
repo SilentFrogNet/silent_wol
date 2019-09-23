@@ -52,6 +52,14 @@ class DBWrapper(object):
         self.cur = self.conn.cursor()
         return self.conn
 
+    def get_devices(self):
+        self.cur.execute("SELECT id, name, mac FROM devices")
+        return {item[1]: {
+            'id': item[0],
+            'name': item[1],
+            'mac': item[2]
+        } for item in self.cur.fetchall()}
+
     def get_device(self, name):
         self.cur.execute(f"SELECT id, name, mac FROM devices WHERE name=\"{name}\"")
         return self.cur.fetchall()
@@ -81,7 +89,6 @@ class DBWrapper(object):
 
         sql = f"DELETE FROM devices WHERE id={row_id}"
         self.cur.execute(sql)
-
 
 
 db = DBWrapper()

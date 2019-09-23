@@ -1,4 +1,4 @@
-from silent_wol.wol import SilentWolBot
+from silent_wol.core.wol import SilentWolBot
 
 silent_wol = SilentWolBot()
 
