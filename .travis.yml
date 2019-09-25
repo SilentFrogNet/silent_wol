@@ -1,0 +1,43 @@
+dist: xenial
+
+branches:
+  only:
+    - master
+    - devel
+
+language: python
+python:
+  - "3.5"
+  - "3.6"
+  - "3.7"
+  # PyPy versions
+  - "pypy3"
+
+cache:
+  directories:
+    - $HOME/.cache/pip
+
+# So that we get a docker container
+sudo: false
+
+## Customize dependencies
+install:
+  - pip install -U pip
+  - pip install -U wheel
+  - pip install -U codecov
+  #  - pip install -U twine # do not want to push to PyPI
+  - pip install -U -e .[testing]
+  - pip install -U .
+
+## Customize test commands - just a pep8 and pylint check for now
+before_script:
+  - pep8 silent_wol && echo 'pep8 success' || echo 'pep8 failure'
+  - pylint silent_wol && echo 'pylint success' || echo 'pylint failure'
+
+# Run our tests
+script:
+  - py.test --cov-report=html --cov-report=xml --cov=sho tests
+
+# Only build artifacts on success
+after_success:
+  - coveralls
