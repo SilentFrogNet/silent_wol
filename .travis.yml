@@ -7,7 +7,8 @@ branches:
 
 language: python
 python:
-  - "3.5"
+  #  - "3.4"  # commented out because not using typing
+  #  - "3.5"  # commented out because not using f-string
   - "3.6"
   - "3.7"
   # PyPy versions
