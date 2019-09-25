@@ -46,10 +46,10 @@ class SilentWolBot(WoLRegisterMixin):
         self.dispatcher = self.updater.dispatcher
         self.logger = logging.getLogger(__name__)
 
-        self.conn = utils.db.connect()
         self.wol_sol = WolSol()
 
-        self.devices = utils.db.get_devices()
+        with utils.DBWrapper() as db:
+            self.devices = db.get_devices()
 
         self.init_register()
 
@@ -66,7 +66,6 @@ class SilentWolBot(WoLRegisterMixin):
 
     def stop_bot(self):
         self.logger.info(f"Stopping {self.name}")
-        self.conn.close()
         self.updater.stop()
 
     def register_handlers(self):
@@ -95,7 +94,7 @@ class SilentWolBot(WoLRegisterMixin):
 
     def error(self, update, context):
         """Log Errors caused by Updates."""
-        self.logger.warning('Update "%s" caused error "%s"', update, context.error)
+        self.logger.warning(f"Error: {context.error}\n  - Update {update}")
 
     @send_typing_action
     def start(self, update, context):
@@ -196,7 +195,7 @@ You can control me by sending these commands:
         """
         This will reply to the `/list` command
         """
-        list_text = ", ".join([d for d in self.devices.keys()])
+        list_text = "\n".join([f"* {d['name']} ({d['mac']})" for _,d in self.devices.items()])
         context.bot.send_message(
             chat_id=utils.get_chat_id(update, context),
             text=list_text
@@ -292,7 +291,8 @@ You can control me by sending these commands:
             return
 
         dev_id = self._get_device_id(dev)
-        utils.db.update_device(dev_id)      # TODO: missing name, mac
+        with utils.DBWrapper() as db:
+            db.update_device(dev_id)      # TODO: missing name, mac
 
         context.bot.send_message(
             chat_id=chat_id,
@@ -314,7 +314,8 @@ You can control me by sending these commands:
             return
 
         dev_id = self._get_device_id(dev)
-        utils.db.delete_device(dev_id)
+        with utils.DBWrapper() as db:
+            db.delete_device(dev_id)
 
         context.bot.send_message(
             chat_id=chat_id,

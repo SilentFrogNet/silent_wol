@@ -1,3 +1,5 @@
+import re
+
 from telegram.ext import (
     CommandHandler,
     MessageHandler,
@@ -6,10 +8,16 @@ from telegram.ext import (
 )
 
 from silent_wol.utils import utils
-from silent_wol.utils.decorators import restricted
+from silent_wol.utils.decorators import (
+    send_typing_action,
+    restricted
+)
 
 
 class WoLRegisterMixin(object):
+
+    def __init__(self):
+        self.re_mac = re.compile(r'^([ ]*([0-9a-fA-F]{2}[:]{0,1}){5}[0-9a-fA-F]{2}[ ]*)$')
 
     def init_register(self):
         self.register_tmps = {}
@@ -19,8 +27,8 @@ class WoLRegisterMixin(object):
             entry_points=[CommandHandler('register', self.register)],
 
             states={
-                utils.RegisterDevice.States.NAME: [MessageHandler(Filters.text, self._register_name)],
-                utils.RegisterDevice.States.MAC: [MessageHandler(Filters.text, self._register_mac)]
+                utils.RegisterDeviceStates.NAME: [MessageHandler(Filters.text, self._register_name)],
+                utils.RegisterDeviceStates.MAC: [MessageHandler(Filters.text, self._register_mac)]
             },
 
             fallbacks=[CommandHandler('cancel', self._register_cancel)]
@@ -28,7 +36,7 @@ class WoLRegisterMixin(object):
         self.dispatcher.add_handler(register_conv_handler)
 
     @staticmethod
-    # @send_typing_action
+    @send_typing_action
     @restricted
     def register(update, context):
         """
@@ -41,8 +49,10 @@ class WoLRegisterMixin(object):
                  "Let's start with the device name"
         )
 
-        return utils.RegisterDevice.States.NAME
+        return utils.RegisterDeviceStates.NAME
 
+    @send_typing_action
+    @restricted
     def _register_name(self, update, context):
         """
         Handles the registration process for the name
@@ -56,8 +66,10 @@ class WoLRegisterMixin(object):
             text="Now give me the MAC address of the device"
         )
 
-        return utils.RegisterDevice.States.MAC
+        return utils.RegisterDeviceStates.MAC
 
+    @send_typing_action
+    @restricted
     def _register_mac(self, update, context):
         """
         Handles the registration process for the mac
@@ -85,6 +97,8 @@ class WoLRegisterMixin(object):
 
         return ConversationHandler.END
 
+    @send_typing_action
+    @restricted
     def _register_cancel(self, update, context):
         """
         Handles the cancel of the registration process
@@ -98,6 +112,8 @@ class WoLRegisterMixin(object):
 
         return ConversationHandler.END
 
+    @send_typing_action
+    @restricted
     def _register_device(self, chat_id):
         tmps = self.register_tmps.get(chat_id, None)
         if not tmps:
@@ -118,15 +134,32 @@ class WoLRegisterMixin(object):
             self.logger.warning(f"MAC address ({mac}) already registered!")
             return utils.StatusCodes.MAC_ADDRESS_ALREADY_EXISTS, "MAC address already registered!"
 
-        self.db.insert_device(name, mac)
+        if not self.re_mac.match(mac):
+            self.logger.warning(f"Invalid MAC address ({mac})!")
+            return utils.StatusCodes.MAC_ADDRESS_INVALID, "Invalid MAC address!"
+
+        with utils.DBWrapper() as db:
+            db.insert_device(name, mac)
         self.devices[name] = mac
         return utils.StatusCodes.OK, None
 
     def _register_tmp_value(self, chat_id, key, value):
+        """
+        Stores a temporary value during the registration process
+
+        :param chat_id: the chat id
+        :param key: the key-reference for the value
+        :param value: the value to store
+        """
         if chat_id not in self.register_tmps:
             self.register_tmps[chat_id] = {}
         self.register_tmps[chat_id][key] = value
 
     def _register_reset_tmps(self, chat_id):
+        """
+        Removes all the temporary values for the specified chat id
+
+        :param chat_id: the chat id
+        """
         if chat_id in self.register_tmps:
             del self.register_tmps[chat_id]
