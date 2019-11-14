@@ -1,6 +1,5 @@
 import pytest
 
-
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -9,7 +8,9 @@ from telegram.ext import (
     Filters
 )
 
-from silent_wol.core.wol import SilentWolBot
+from wol.core.wol import SilentWolBot
+from wol.tests.utils import setup_test, teardown_test
+
 
 # --- [DATA] --- #
 # sho_items_data = [
@@ -43,6 +44,15 @@ def bot():
     """ Creates Silent WoL Bot fixture to use in other tests"""
     return SilentWolBot()
 
+
+def setup_module(module):
+    setup_test()
+
+
+def teardown_module(module):
+    teardown_test()
+
+
 # @pytest.fixture(params=sho_items_data)
 # def sho_item_dict(request, sho):
 #     """ Creates valid ShoItem from dict fixture to use in other tests"""
@@ -61,31 +71,13 @@ def bot():
 # --- [/FIXTURES] --- #
 
 
-# --- [SUPPORT FUNCTIONS] --- #
-# def add_valid_shells(sho: Sho) -> None:
-#     for s in sho_items_data:
-#         sho.add_item(ShoItem(**s))
-
-
-def compare_lists(list1: list, list2: list) -> None:
-    """ Compares two lists and checks if they are equal """
-    found = True
-    for el in list1:
-        if found and el not in list2:
-            found = False
-            break
-    return found
-# --- [/SUPPORT FUNCTIONS] --- #
-
-
 # --- [TESTS] --- #
-def test_creation(bot:SilentWolBot) -> None:
+def test_creation(bot: SilentWolBot) -> None:
     assert isinstance(bot, SilentWolBot)
     assert isinstance(bot.name, str)
     assert bot.name != ''
     assert isinstance(bot.updater, Updater)
-#
-#
+
 #
 # def test_create_sho() -> None:
 #     """ Tests the creation of a Sho instance """

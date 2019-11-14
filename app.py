@@ -1,5 +1,10 @@
-from silent_wol.core.wol import SilentWolBot
+from wol.wol import SilentWolBot
 
-silent_wol = SilentWolBot()
 
-silent_wol.run_bot()
+def main():
+    silent_wol = SilentWolBot()
+    silent_wol.run_bot()
+
+
+if __name__ == '__main__':
+    main()

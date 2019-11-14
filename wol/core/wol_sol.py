@@ -1,14 +1,14 @@
 from wakeonlan import send_magic_packet
-from silent_mqtt.core.smqtt import SilentMQTT
 
-from silent_wol.utils.custom_types import MacList
+from mqtt.silent_events import SilentEvents
+from wol.utils.custom_types import MacList
 
 
 class WolSol(object):
     """ Performs WoL and SoL operations on the specified devices """
 
     def __init__(self):
-        self.smqtt = SilentMQTT('asd')
+        self.smqtt = SilentEvents("192.168.1.106")
 
     def wol(self, *macs: MacList) -> None:
         to_wake_up = list(set(macs))

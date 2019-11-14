@@ -1,6 +1,9 @@
-import sqlite3
+import os
+import sys
 
-from silent_wol import settings
+from wol.db import engine, session
+from wol.db.utils import create_tables
+from wol.db.models import Device
 
 
 def build_menu(buttons,
@@ -23,6 +26,8 @@ def get_chat_id(update, context) -> int:
     :param context:
     :return: the chat id
     """
+    if isinstance(context, int):
+        return context
     try:
         return update.message.chat_id
     except Exception:
@@ -54,25 +59,16 @@ class DBWrapper(object):
     """ Context manager to handle all DB-related operations """
 
     def __init__(self):
-        self.conn = None
-        self.cur = None
+        self.engine = engine
+        self.session = session
 
     def __enter__(self):
-        self.connect()
+        create_tables()
+        # self.conn = self.engine.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.cur.close()
-        self.conn.close()
-
-    def connect(self, db_path: str = settings.DB_PATH):
-        """
-        Sets up the connection with the DB
-
-        :param db_path: the path to the DB
-        """
-        self.conn = sqlite3.connect(db_path)
-        self.cur = self.conn.cursor()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.session.close_all()
 
     def get_devices(self) -> dict:
         """
@@ -80,12 +76,9 @@ class DBWrapper(object):
 
         :return: a dictionary describing all the stored devices
         """
-        self.cur.execute("SELECT id, name, mac FROM devices")
-        return {item[1]: {
-            'id': item[0],
-            'name': item[1],
-            'mac': item[2]
-        } for item in self.cur.fetchall()}
+        devices = self.session.query(Device).all()
+        res = {d.name: {'id': d.id, 'name': d.name, 'mac': d.mac, 'net_name': d.net_name} for d in devices}
+        return res
 
     def get_device(self, name: str) -> dict or None:
         """
@@ -94,59 +87,71 @@ class DBWrapper(object):
         :param name: the name of the device to retrieve
         :return: the device if found, None otherwise
         """
-        self.cur.execute(f"SELECT id, name, mac FROM devices WHERE name=\"{name}\"")
-        res = self.cur.fetchall()
-        if res:
-            return res[0]
-        return None
+        device = self.session.query(Device).filter_by(name=name).one()
+        return device
 
-    def insert_device(self, name: str, mac: str) -> None:
+    def insert_device(self, name: str, mac: str, net_name: str = None) -> None:
         """
         Inserts a new device in the DB
 
         :param name: the name of the new device
         :param mac: the mac address of the new device
+        :param net_name: the real network name of the device used for the commands
         """
-        sql = f"INSERT INTO devices (name, mac) VALUES (?, ?)"
-        self.cur.execute(sql, (name, mac))
-        self.conn.commit()
+        if not net_name:
+            net_name = name
 
-    def update_device_by_name(self, name: str, newName: str, mac: str) -> None:
+        dev = Device(name=name, mac=mac, net_name=net_name)
+        self.session.add(dev)
+        self.session.commit()
+
+    def update_device_by_name(self, name: str, new_name: str = None, mac: str = None, net_name: str = None) -> None:
         """
         Updates the device identified by the name with the info provided
 
         :param name: the old name of the device
-        :param newName: the new name for the device
+        :param new_name: the new name for the device
         :param mac: the new mac address for the device
+        :param net_name: the new network name for the device
         """
         dev = self.get_device(name)
         if dev:
-            return self.update_device(dev['id'], newName, mac)
+            return self.update_device(dev['id'], new_name, mac, net_name)
 
-    def update_device(self, row_id: int, name: str = None, mac: str = None) -> None:
+    def update_device(self, row_id: int, name: str = None, mac: str = None, net_name: str = None) -> None:
         """
         Updates the specified device with the provided information
 
         :param row_id: the ID of the device to update
         :param name: the new name for the device
         :param mac: the new mac address for the device
+        :param net_name: the new network name for the device
         """
-        if not name and not mac:
+        if not name and not mac and not net_name:
             return
 
-        sql = "UPDATE devices SET "
-        if name:
-            sql += f" name={name} "
-        if mac:
-            sql += f" mac={mac} "
-        sql += f" WHERE id={row_id}"
-        self.cur.execute(sql)
-        self.conn.commit()
+        dev = self.session.query(Device).filter_by(id=row_id).one()
+        if dev:
+            if name:
+                dev.name = name
+            if mac:
+                dev.mac = mac
+            if net_name:
+                dev.net_name = net_name
+
+            self.session.add(dev)
+            self.session.commit()
 
     def remove_device_by_name(self, name: str) -> None:
+        """
+        Removes the device identified by the name
+
+        :param name: the name of the device
+        """
         dev = self.get_device(name)
         if dev:
             return self.remove_device(dev['id'])
+        return None
 
     def remove_device(self, row_id: int) -> None:
         """
@@ -154,12 +159,17 @@ class DBWrapper(object):
 
         :param row_id: the ID of the device to remove
         """
-        sql = f"SELECT count(*) FROM devices WHERE id={row_id}"
-        self.cur.execute(sql)
-        res = self.cur.fetchall()
-        if res[0][0] != 1:
-            return
+        dev = self.session.query(Device).filter_by(id=row_id).one()
+        self.session.delete(dev)
+        self.session.commit()
 
-        sql = f"DELETE FROM devices WHERE id={row_id}"
-        self.cur.execute(sql)
-        self.conn.commit()
+
+def to_int(val, default=0):
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
+
+def get_project_path():
+    return os.path.dirname(os.path.realpath(sys.argv[0]))

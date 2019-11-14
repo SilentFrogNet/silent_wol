@@ -7,22 +7,27 @@ from telegram.ext import (
     Filters
 )
 
-from silent_wol.utils import utils
-from silent_wol.utils.decorators import (
+from wol.utils import utils
+from wol.utils.decorators import (
     send_typing_action,
     restricted
 )
 
+from wol.loaders.command_loader import commands_foo
 
-class WoLRegisterMixin(object):
+
+class RegisterCommand(object):
 
     def __init__(self):
         self.re_mac = re.compile(r'^([ ]*([0-9a-fA-F]{2}[:]{0,1}){5}[0-9a-fA-F]{2}[ ]*)$')
-
-    def init_register(self):
         self.register_tmps = {}
 
-    def register_handler_register(self):
+    @commands_foo
+    def init(self):
+        self.register_tmps = {}
+
+    @commands_foo
+    def register_handlers(self, dispatcher):
         register_conv_handler = ConversationHandler(
             entry_points=[CommandHandler('register', self.register)],
 
@@ -33,7 +38,16 @@ class WoLRegisterMixin(object):
 
             fallbacks=[CommandHandler('cancel', self._register_cancel)]
         )
-        self.dispatcher.add_handler(register_conv_handler)
+        dispatcher.add_handler(register_conv_handler)
+
+    @commands_foo
+    def get_foo_to_push(self):
+        return [
+            self.register,
+            self._register_name,
+            self._register_mac,
+            self._register_cancel
+        ]
 
     @staticmethod
     @send_typing_action

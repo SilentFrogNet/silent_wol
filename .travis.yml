@@ -32,7 +32,7 @@ install:
 
 ## Customize test commands - just a pep8 and pylint check for now
 before_script:
-  - pep8 silent_wol && echo 'pep8 success' || echo 'pep8 failure'
+  - pep8 --ignore=E501 silent_wol && echo 'pep8 success' || echo 'pep8 failure'
   - pylint silent_wol && echo 'pylint success' || echo 'pylint failure'
 
 # Run our tests

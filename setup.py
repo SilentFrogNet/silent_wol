@@ -11,8 +11,10 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 requirements = [
+    'sqlalchemy',
     'python-telegram-bot',
     'wakeonlan',
+    'pluggy'
 ]
 
 testing_requirements = [
@@ -39,6 +41,7 @@ setup(
     zip_safe=False,
     install_requires=requirements,
     dependency_links=[
+        # 'https://github.com/SilentFrogNet/silent_mqtt/tarball/master#egg=silent_mqtt-0.0.1'
     ],
     extras_require={
         'testing': testing_requirements,

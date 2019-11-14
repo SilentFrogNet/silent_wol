@@ -12,18 +12,19 @@ from telegram.ext import (
     Filters
 )
 
-from silent_wol.credentials import (
-    bot_token,
-    bot_user_name
+from wol.credentials import (
+    BOT_TOKEN,
+    BOT_USER_NAME
 )
-from silent_wol.utils import utils
-from silent_wol.core.register_mixin import WoLRegisterMixin
-from silent_wol.utils.decorators import (
+from wol.utils import utils
+from wol.core.register_mixin import WoLRegisterMixin
+from wol.utils.decorators import (
     restricted,
     send_typing_action
 )
-from silent_wol import settings
-from silent_wol.core.wol_sol import WolSol
+from wol import settings
+from wol.core.wol_sol import WolSol
+from wol.loaders.command_loader import CommandLoader
 
 # Enable logging
 logging.basicConfig(
@@ -32,7 +33,7 @@ logging.basicConfig(
 )
 
 
-class SilentWolBot(WoLRegisterMixin):
+class SilentWolBot: #(WoLRegisterMixin):
     """ The Silent WOL Bot """
 
     WOL_PREFIX = "wol_"
@@ -40,20 +41,24 @@ class SilentWolBot(WoLRegisterMixin):
     EDIT_PREFIX = "edit_"
     DELETE_PREFIX = "del_"
 
-    def __init__(self, name=bot_user_name):
+    def __init__(self, name=BOT_USER_NAME):
         self.name = name
-        self.updater = Updater(token=bot_token, use_context=True)
+        self.updater = Updater(token=BOT_TOKEN, use_context=True)
         self.dispatcher = self.updater.dispatcher
         self.logger = logging.getLogger(__name__)
 
+        self.commands_loader = CommandLoader()
+        self.commands_loader.register_plugins()
+        self.plugin_manager = self.commands_loader.get_plugin_manager()
+
         self.wol_sol = WolSol()
 
-        with utils.DBWrapper() as db:
-            self.devices = db.get_devices()
+        self._reload_devices()
 
-        self.init_register()
+        self.plugin_manager.hook.init()
 
         self.register_handlers()
+        self.push_foo()
 
     def run_bot(self):
         self.logger.info(f"Starting {self.name}")
@@ -78,7 +83,8 @@ class SilentWolBot(WoLRegisterMixin):
         self.dispatcher.add_handler(CommandHandler('list', self.list))
 
         # Register mixin's handlers
-        self.register_handler_register()
+        # self.register_handler_register()
+        self.plugin_manager.hook.register_handlers()
 
         # Callback query handlers
         self.dispatcher.add_handler(CallbackQueryHandler(self._wol_handler, pattern=f'{self.WOL_PREFIX}.*?'))
@@ -91,6 +97,10 @@ class SilentWolBot(WoLRegisterMixin):
 
         # Manage all unknown commands
         self.dispatcher.add_handler(MessageHandler(Filters.command, self.unknown))
+
+    def push_foo(self):
+        for foo in self.plugin_manager.hook.get_foo_to_push():
+            print(foo)
 
     def error(self, update, context):
         """Log Errors caused by Updates."""
@@ -127,6 +137,7 @@ I can help you register and manage WoL enabled devices.
 You can control me by sending these commands:
 
 /register - registers a new device
+/list - lists all the registered devices
 /edit - edits the device
 /delete - removes the device
 /wakeup - wakes up the device
@@ -195,7 +206,10 @@ You can control me by sending these commands:
         """
         This will reply to the `/list` command
         """
-        list_text = "\n".join([f"* {d['name']} ({d['mac']})" for _,d in self.devices.items()])
+        if not self.devices:
+            list_text = "No device found. Run the /register command to add one."
+        else:
+            list_text = "\n".join([f"* {d['name']} ({d['mac']})" for _, d in self.devices.items()])
         context.bot.send_message(
             chat_id=utils.get_chat_id(update, context),
             text=list_text
@@ -292,7 +306,7 @@ You can control me by sending these commands:
 
         dev_id = self._get_device_id(dev)
         with utils.DBWrapper() as db:
-            db.update_device(dev_id)      # TODO: missing name, mac
+            db.update_device(dev_id)  # TODO: missing name, mac
 
         context.bot.send_message(
             chat_id=chat_id,
@@ -315,9 +329,15 @@ You can control me by sending these commands:
 
         dev_id = self._get_device_id(dev)
         with utils.DBWrapper() as db:
-            db.delete_device(dev_id)
+            db.remove_device(dev_id)
+
+        self._reload_devices()
 
         context.bot.send_message(
             chat_id=chat_id,
             text=f"Device {dev} deleted!"
         )
+
+    def _reload_devices(self):
+        with utils.DBWrapper() as db:
+            self.devices = db.get_devices()

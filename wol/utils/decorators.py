@@ -1,8 +1,8 @@
 from functools import wraps
 from telegram import ChatAction
 
-from silent_wol.utils import utils
-from silent_wol import settings
+from wol.utils import utils
+from wol import settings
 
 
 def get_user_id(update, context):
