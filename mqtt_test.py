@@ -1,23 +1,16 @@
-import random
-import time
-
-from mqtt.core.smqtt import SilentMQTT
-
-
-def read_from_thermometer():
-    return random.randrange(15, 25)
+from mqtt.silent_events import SilentEvents
 
 
 def main():
-    broker = "broker.mqttdashboard.com"  # "silent_mqtt"
-    port = 1883  # 1883
+    broker = "192.168.1.200"
+    port = 1883
 
-    with SilentMQTT(broker, port) as smqtt:
-        for _ in range(10):
-            temperature = read_from_thermometer()
-            (rc, mid) = smqtt.publish("testtopic/4", str(temperature), qos=1)
-            print(f"RC: {rc} - MID: {mid}")
-            # time.sleep(0.5)
+    se = SilentEvents(broker, port)
+
+    se.send_media_playpause({
+        'domain': "workgroup",
+        'name': "pc-ilo"
+    })
 
 
 if __name__ == '__main__':
